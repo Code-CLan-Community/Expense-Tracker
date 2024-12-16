@@ -9,7 +9,6 @@ passport.use(new LocalStrategy(UserSchema.authenticate()));
 
 const { isLoggedIn } = require("../middlewares/auth.middleware");
 const upload = require("../middlewares/multimedia.middleware");
-const imagekit = require("../config/imagekit");
 const fs = require("fs");
 
 router.get("/signup", async (req, res) => {
@@ -40,7 +39,6 @@ router.get("/signin", async (req, res) => {
 
 router.post("/signin", passport.authenticate("local"), async (req, res) => {
     try {
-        // set cache to store user details
         req.flash("success", "Successfully LoggedIn!");
         res.redirect("/user/profile");
     } catch (error) {
@@ -75,7 +73,6 @@ router.get("/profile", isLoggedIn, async (req, res) => {
 
 router.get("/signout", isLoggedIn, async (req, res) => {
     req.logout(() => {
-        // delete cache from redis
         res.redirect("/user/signin");
     });
 });
@@ -106,7 +103,6 @@ router.get("/delete-account", isLoggedIn, async (req, res) => {
         if (user.avatar != "default.jpg") {
             fs.unlinkSync(`public/images/${user.avatar}`);
         }
-        // delete cache from redis
         // code to delete all relaated expenses
         res.redirect("/user/signin");
     } catch (error) {
@@ -124,51 +120,29 @@ router.get("/update", isLoggedIn, async (req, res) => {
 router.post("/update", isLoggedIn, async (req, res) => {
     try {
         await UserSchema.findByIdAndUpdate(req.user._id, req.body);
-        // set cache to store user details with updated details
         res.redirect("/user/profile");
     } catch (error) {
         next(error);
     }
 });
 
-router.post("/avatar", isLoggedIn, async (req, res, next) => {
-    try {
-        if (req.user.avatar.fileId) {
-            await imagekit.deleteFile(req.user.avatar.fileId);
+router.post(
+    "/avatar",
+    isLoggedIn,
+    upload.single("avatar"),
+    async (req, res) => {
+        try {
+            if (req.user.avatar != "default.jpg") {
+                fs.unlinkSync(`public/images/${req.user.avatar}`);
+            }
+            req.user.avatar = req.file.filename;
+            await req.user.save();
+            res.redirect("/user/update");
+        } catch (error) {
+            next(error);
         }
-
-        const result = await imagekit.upload({
-            file: req.files.avatar.data,
-            fileName: req.files.avatar.name,
-        });
-        const { fileId, url, thumbnailUrl } = result;
-
-        req.user.avatar = { fileId, url, thumbnailUrl };
-        await req.user.save();
-        res.redirect("/user/update");
-    } catch (error) {
-        next(error);
     }
-});
-
-// router.post(
-//     "/avatar",
-//     isLoggedIn,
-//     upload.single("avatar"),
-//     async (req, res) => {
-//         try {
-//             if (req.user.avatar != "default.jpg") {
-//                 fs.unlinkSync(`public/images/${req.user.avatar}`);
-//             }
-//             req.user.avatar = req.file.filename;
-//             await req.user.save();
-//             // set cache to store user details with updated avatar
-//             res.redirect("/user/update");
-//         } catch (error) {
-//             next(error);
-//         }
-//     }
-// );
+);
 
 router.get("/forget-password", async (req, res) => {
     res.render("forgetpassword_email", {
@@ -205,8 +179,6 @@ router.post("/forget-password/:id", async (req, res, next) => {
 
         // compare the req.body.otp with the otp in database
         // if matched redirect to password page else ERROR
-
-        // set cache to store user details with updated otp
         res.redirect(`/user/set-password/${user._id}`);
     } catch (error) {
         next(error);
@@ -226,7 +198,6 @@ router.post("/set-password/:id", async (req, res, next) => {
         const user = await UserSchema.findById(req.params.id);
         await user.setPassword(req.body.password);
         await user.save();
-        // set cache to store user details with updated password
         res.redirect("/user/signin");
     } catch (error) {
         next(error);

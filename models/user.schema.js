@@ -19,19 +19,9 @@ const userSchema = new mongoose.Schema({
         match: [/^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/, "Invalid Email Format"],
     },
     avatar: {
-        type: Object,
-        default: {
-            fileId: "",
-            url: "public/images/default.png",
-            thumbnailUrl: "public/images/default.png",
-        },
+        type: String,
+        default: "default.jpg",
     },
-    expenses: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "expense",
-        },
-    ],
 });
 // userSchema.plugin(plm, { usernameField: "email" }); // for email as username // createStrategy
 userSchema.plugin(plm);
